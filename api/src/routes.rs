@@ -43,8 +43,16 @@ pub fn login(conn: DbConn, mut cookies: Cookies, login_form: Json<Login>) -> Jso
 
     // does a user with this username exist and was a correct password entered?
     if validation_ok {
+        
         // Add jwt cookie
         cookies.add(cookie);
+
+        if !jwt_impl::has_access(&cookies) {
+            println!("Warning: Failed to create a valid cookie!!");
+        } else {
+            println!("Success: Created a valid cookie on login!!");
+        }
+
     }
 
     // return json with status that informs whether the login was successful and a cookie was created or not
