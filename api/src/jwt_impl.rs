@@ -3,6 +3,7 @@
 use ::serde::{Serialize, Deserialize};
 use ::time;
 use ::jwt::{encode, decode, Header, Algorithm, Validation};
+use ::rocket::http::{Cookies,Cookie};
 
 // head -c16 /dev/urandom > secret.key
 static KEY: &'static [u8; 16] = include_bytes!("../secret.key");
@@ -34,4 +35,20 @@ pub fn jwt_generate(user: String, roles: Vec<String>) -> String {
     };
 
     encode(&Header::default(), &payload, KEY).unwrap()
+}
+
+pub fn has_access(cookies: &Cookies) -> bool {
+    let token = cookies.get("jwt").map(|c| c.value());
+
+    match token {
+        Some(token) => {
+            let result = decode::<UserRolesToken>(&token, KEY.as_ref(), &Validation::default());
+            match result {
+                Ok(_) => true,
+                Err(_) => false
+            }
+        },
+        None => false
+    }
+    
 }
