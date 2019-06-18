@@ -1,0 +1,30 @@
+version: "3"
+services:
+
+    m183_postgres_service:
+        image: "postgres:alpine"
+        container_name: "m183_postgres_container"
+        ports:
+            - "54320:5432"
+        volumes:
+            - m183_postgres_datavolume:/var/lib/postgresql/data
+        environment:
+            POSTGRES_DB: m183_db
+            POSTGRES_USER: postgres
+            POSTGRES_PASSWORD: postgres
+            
+    # m183_backend_service:
+    #     image: "m183_rust_app_image"
+    #     container_name: "m183_rust_app_container"
+    #     ports:
+    #         - "80000:8000"
+    
+    # m183_frontend_service:
+    #     image: "m183_elm_app_image"
+    #     container_name: "m183_elm_app_container"
+    #     ports:
+    #         - "80800:8080"
+    
+    
+volumes:
+    m183_postgres_datavolume:
