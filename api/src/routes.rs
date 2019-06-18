@@ -7,6 +7,8 @@ use ::rocket_contrib::json::JsonValue;
 use ::rocket::request::Form;
 use ::rocket::http::{Cookies,Cookie};
 
+#[derive(Serialize)]    // Convertable to json
+#[derive(Deserialize)]  // Convertable from json
 #[derive(FromForm)]
 pub struct Login {
     pub username: String,
@@ -62,7 +64,7 @@ pub fn all_users(conn: DbConn, cookies: Cookies) -> JsonValue {
 }
 
 #[post("/users", format= "application/json", data = "<login_form>")]
-pub fn new_user(conn: DbConn, cookies: Cookies, login_form: Form<Login>) -> JsonValue {
+pub fn new_user(conn: DbConn, login_form: Json<Login>) -> JsonValue {
     let new_user = login_form.hash_user();
     let insert_ok: bool = User::insert(new_user/*.into_inner()*/, &conn);
     let users = User::all(&conn);

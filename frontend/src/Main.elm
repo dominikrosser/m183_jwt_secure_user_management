@@ -4,6 +4,10 @@ import Browser
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick, onInput)
+import Http
+import Json.Decode
+import Json.Encode
+import RemoteData exposing (WebData)
 
 
 
@@ -12,7 +16,7 @@ import Html.Events exposing (onClick, onInput)
 main =
     Browser.element
         { init = init
-        , view = view 
+        , view = view
         , update = update
         , subscriptions = subscriptions
         }
@@ -33,16 +37,18 @@ type alias Model =
     { route: Route
     , loginPageData: LoginPageData
     , registerPageData: RegisterPageData
+    , usersPageData: UsersPageData
     }
 
 type Route
     = LoginRoute
     | ProfileRoute
     | RegisterRoute
+    | UsersRoute
 
 initialModel : Model
 initialModel =
-    Model ProfileRoute emptyLoginPageData emptyRegisterPageData
+    Model ProfileRoute emptyLoginPageData emptyRegisterPageData emptyUsersPageData
 
 type alias LoginPageData =
     { usernameInput: String
@@ -62,6 +68,25 @@ emptyRegisterPageData : RegisterPageData
 emptyRegisterPageData =
     RegisterPageData "" ""
 
+type alias User =
+    { username: String
+    , pw_hash: String
+    , pw_salt: String
+    }
+
+type alias UsersPageData =
+    { users: WebData (List User)
+    }
+
+emptyUsersPageData : UsersPageData
+emptyUsersPageData =
+    UsersPageData RemoteData.NotAsked
+
+type alias NewUser =
+    { username: String
+    , password: String
+    }
+
 
 
 -- UDPATE
@@ -75,6 +100,9 @@ type Msg
     | ChangeLoginPasswordInput String
     | ChangeRegisterUsernameInput String
     | ChangeRegisterPasswordInput String
+    | RegisterUser
+    | TryLogin
+    | GotRegisterUserResponse (Result Http.Error String) -- String=status true if successfully added
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
@@ -103,6 +131,20 @@ update msg model =
 
         ChangeRegisterPasswordInput str ->
             ( { model | registerPageData = { usernameInput = model.registerPageData.usernameInput, passwordInput = str }}, Cmd.none )
+
+        RegisterUser ->
+            ( model, registerUserCmd (NewUser model.registerPageData.usernameInput model.registerPageData.passwordInput))
+
+        GotRegisterUserResponse result ->
+            case result of
+                Err error ->
+                    ( { model | registerPageData = { usernameInput = "Failed to add new user!", passwordInput = model.registerPageData.passwordInput }}, Cmd.none )
+
+                Ok status ->
+                    ( { model | registerPageData = { usernameInput = "Added new user, Status: " ++ status, passwordInput = model.registerPageData.passwordInput }}, Cmd.none )
+
+        TryLogin ->
+            ( model, tryLoginCmd )
             
 
 
@@ -116,8 +158,47 @@ subscriptions model =
 
 -- COMMANDS
 
+urlPathToApi : String
+urlPathToApi =
+    "http://0.0.0.0:8181/api/v1/"
+
+registerUserCmd : NewUser -> Cmd Msg
+registerUserCmd user =
+    let
+        body =
+            newUserEncoder user
+                |> Http.jsonBody
+
+        url =
+            (urlPathToApi ++ "users")
+
+        expect = Http.expectJson GotRegisterUserResponse statusDecoder
+
+    in
+    Http.post
+        { url = url
+        , body = body
+        , expect = expect
+        }
+
+tryLoginCmd : Cmd msg
+tryLoginCmd =
+    Cmd.none
 
 
+
+-- DECODERS & ENCODERS
+
+statusDecoder : Json.Decode.Decoder String
+statusDecoder =
+    Json.Decode.field "status" Json.Decode.string
+
+newUserEncoder : NewUser -> Json.Encode.Value
+newUserEncoder user =
+    Json.Encode.object
+        [ ( "username", Json.Encode.string user.username )
+        , ( "password", Json.Encode.string user.password )
+        ]
 
 
 -- VIEW
@@ -135,6 +216,9 @@ view model =
 
                 RegisterRoute ->
                     registerView model.registerPageData
+
+                UsersRoute ->
+                    usersView model.usersPageData
             
     in
     div []
@@ -204,7 +288,11 @@ loginView data =
                             -- Submit Button
                             , div [ class "form-group" ]
                                 [ div [ class "col-md-offset-2 col-md-10" ]
-                                    [ input [ type_ "submit", value "Anmelden", class "btn btn-primary" ][] ]
+                                    [ input [ type_ "submit", value "Anmelden", class "btn btn-primary"
+                                            , onClick TryLogin
+                                            ]
+                                            []
+                                    ]
                                 ]
                         ]
                     ]
@@ -271,7 +359,8 @@ registerView data =
                         -- Submit register button
                         , div [ class "form-group" ]
                             [ div [ class "col-md-offset-2 col-md-10" ]
-                                [ input [ type_ "submit", value "Registrieren", class "btn btn-primary" ]
+                                [ input [ type_ "submit", value "Registrieren", class "btn btn-primary"
+                                        , onClick RegisterUser ]
                                     []
                                 ]
                             ]
@@ -280,3 +369,7 @@ registerView data =
                 ]
             ]
         ]
+
+usersView : UsersPageData -> Html Msg
+usersView data =
+    text "Users - TODO"

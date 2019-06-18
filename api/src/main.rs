@@ -73,5 +73,9 @@ fn main() {
         .manage(pool)
         .mount("/", routes![routes::index])
         .mount("/api/v1/", routes![routes::all_users, routes::new_user, routes::show_user, routes::update_user, routes::delete_user])
+
+        // Set custom CORS options
+        .attach(cors_options::cors_options())
+
         .launch();
 }
