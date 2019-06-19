@@ -4503,9 +4503,8 @@ var author$project$Main$emptyRegisterPageData = A2(author$project$Main$RegisterP
 var author$project$Main$UsersPageData = function (users) {
 	return {users: users};
 };
-var krisajenkins$remotedata$RemoteData$NotAsked = {$: 'NotAsked'};
-var author$project$Main$emptyUsersPageData = author$project$Main$UsersPageData(krisajenkins$remotedata$RemoteData$NotAsked);
 var elm$core$Maybe$Nothing = {$: 'Nothing'};
+var author$project$Main$emptyUsersPageData = author$project$Main$UsersPageData(elm$core$Maybe$Nothing);
 var author$project$Main$initialModel = A6(author$project$Main$Model, author$project$Main$LoginRoute, author$project$Main$emptyLoginPageData, author$project$Main$emptyRegisterPageData, author$project$Main$emptyUsersPageData, elm$core$Maybe$Nothing, '');
 var elm$core$Basics$False = {$: 'False'};
 var elm$core$Basics$True = {$: 'True'};
@@ -4998,24 +4997,38 @@ var author$project$Main$NewUser = F2(
 	});
 var author$project$Main$ProfileRoute = {$: 'ProfileRoute'};
 var author$project$Main$RegisterRoute = {$: 'RegisterRoute'};
-var author$project$Main$httpErrorToString = function (httpError) {
-	switch (httpError.$) {
-		case 'BadUrl':
-			return 'Bad Url (did not provide a valid URL)';
-		case 'Timeout':
-			return 'TimeoutError (took too long to get a response)';
-		case 'NetworkError':
-			return 'NetworkError';
-		case 'BadStatus':
-			return 'Bad Status (got a response back but status code indicates failure)';
-		default:
-			var str = httpError.a;
-			return 'Bad Body (body of response was smth. unexpected) ' + str;
-	}
+var author$project$Main$UsersRoute = {$: 'UsersRoute'};
+var author$project$Main$GotAllUsersResponse = function (a) {
+	return {$: 'GotAllUsersResponse', a: a};
 };
-var author$project$Main$GotRegisterUserResponse = function (a) {
-	return {$: 'GotRegisterUserResponse', a: a};
-};
+var author$project$Main$GetAllUsersResponse = F2(
+	function (status, result) {
+		return {result: result, status: status};
+	});
+var author$project$Main$User = F3(
+	function (username, pw_hash, pw_salt) {
+		return {pw_hash: pw_hash, pw_salt: pw_salt, username: username};
+	});
+var elm$json$Json$Decode$field = _Json_decodeField;
+var elm$json$Json$Decode$map3 = _Json_map3;
+var elm$json$Json$Decode$string = _Json_decodeString;
+var author$project$Main$userDecoder = A4(
+	elm$json$Json$Decode$map3,
+	author$project$Main$User,
+	A2(elm$json$Json$Decode$field, 'username', elm$json$Json$Decode$string),
+	A2(elm$json$Json$Decode$field, 'pw_hash', elm$json$Json$Decode$string),
+	A2(elm$json$Json$Decode$field, 'pw_salt', elm$json$Json$Decode$string));
+var elm$json$Json$Decode$int = _Json_decodeInt;
+var elm$json$Json$Decode$list = _Json_decodeList;
+var elm$json$Json$Decode$map2 = _Json_map2;
+var author$project$Main$getAllUsersResponseDecoder = A3(
+	elm$json$Json$Decode$map2,
+	author$project$Main$GetAllUsersResponse,
+	A2(elm$json$Json$Decode$field, 'status', elm$json$Json$Decode$int),
+	A2(
+		elm$json$Json$Decode$field,
+		'result',
+		elm$json$Json$Decode$list(author$project$Main$userDecoder)));
 var elm$json$Json$Encode$object = function (pairs) {
 	return _Json_wrap(
 		A3(
@@ -5030,21 +5043,15 @@ var elm$json$Json$Encode$object = function (pairs) {
 			pairs));
 };
 var elm$json$Json$Encode$string = _Json_wrap;
-var author$project$Main$newUserEncoder = function (user) {
+var author$project$Main$jwtTokenForServerEncoder = function (token) {
 	return elm$json$Json$Encode$object(
 		_List_fromArray(
 			[
 				_Utils_Tuple2(
-				'username',
-				elm$json$Json$Encode$string(user.username)),
-				_Utils_Tuple2(
-				'password',
-				elm$json$Json$Encode$string(user.password))
+				'token',
+				elm$json$Json$Encode$string(token))
 			]));
 };
-var elm$json$Json$Decode$bool = _Json_decodeBool;
-var elm$json$Json$Decode$field = _Json_decodeField;
-var author$project$Main$statusDecoder = A2(elm$json$Json$Decode$field, 'status', elm$json$Json$Decode$bool);
 var author$project$Main$urlPathToApi = 'http://0.0.0.0:8181/api/v1/';
 var elm$core$Result$mapError = F2(
 	function (f, result) {
@@ -5932,8 +5939,48 @@ var elm$http$Http$post = function (r) {
 	return elm$http$Http$request(
 		{body: r.body, expect: r.expect, headers: _List_Nil, method: 'POST', timeout: elm$core$Maybe$Nothing, tracker: elm$core$Maybe$Nothing, url: r.url});
 };
+var author$project$Main$getAllUsersCmd = function (token) {
+	var url = author$project$Main$urlPathToApi + 'users/all';
+	var expect = A2(elm$http$Http$expectJson, author$project$Main$GotAllUsersResponse, author$project$Main$getAllUsersResponseDecoder);
+	var body = elm$http$Http$jsonBody(
+		author$project$Main$jwtTokenForServerEncoder(token));
+	return elm$http$Http$post(
+		{body: body, expect: expect, url: url});
+};
+var author$project$Main$httpErrorToString = function (httpError) {
+	switch (httpError.$) {
+		case 'BadUrl':
+			return 'Bad Url (did not provide a valid URL)';
+		case 'Timeout':
+			return 'TimeoutError (took too long to get a response)';
+		case 'NetworkError':
+			return 'NetworkError';
+		case 'BadStatus':
+			return 'Bad Status (got a response back but status code indicates failure)';
+		default:
+			var str = httpError.a;
+			return 'Bad Body (body of response was smth. unexpected) ' + str;
+	}
+};
+var author$project$Main$GotRegisterUserResponse = function (a) {
+	return {$: 'GotRegisterUserResponse', a: a};
+};
+var author$project$Main$newUserEncoder = function (user) {
+	return elm$json$Json$Encode$object(
+		_List_fromArray(
+			[
+				_Utils_Tuple2(
+				'username',
+				elm$json$Json$Encode$string(user.username)),
+				_Utils_Tuple2(
+				'password',
+				elm$json$Json$Encode$string(user.password))
+			]));
+};
+var elm$json$Json$Decode$bool = _Json_decodeBool;
+var author$project$Main$statusDecoder = A2(elm$json$Json$Decode$field, 'status', elm$json$Json$Decode$bool);
 var author$project$Main$registerUserCmd = function (user) {
-	var url = author$project$Main$urlPathToApi + 'users';
+	var url = author$project$Main$urlPathToApi + 'users/add';
 	var expect = A2(elm$http$Http$expectJson, author$project$Main$GotRegisterUserResponse, author$project$Main$statusDecoder);
 	var body = elm$http$Http$jsonBody(
 		author$project$Main$newUserEncoder(user));
@@ -5947,8 +5994,6 @@ var author$project$Main$TryLoginResponse = F2(
 	function (jwttoken, status) {
 		return {jwttoken: jwttoken, status: status};
 	});
-var elm$json$Json$Decode$map2 = _Json_map2;
-var elm$json$Json$Decode$string = _Json_decodeString;
 var author$project$Main$loginResponseDecoder = A3(
 	elm$json$Json$Decode$map2,
 	author$project$Main$TryLoginResponse,
@@ -5998,6 +6043,22 @@ var author$project$Main$update = F2(
 						model,
 						{route: author$project$Main$ProfileRoute}),
 					elm$core$Platform$Cmd$none);
+			case 'ShowUsersPage':
+				var _n2 = model.jwtToken;
+				if (_n2.$ === 'Nothing') {
+					return _Utils_Tuple2(
+						_Utils_update(
+							model,
+							{bottomUserMessage: 'You are not logged in!'}),
+						elm$core$Platform$Cmd$none);
+				} else {
+					var token = _n2.a;
+					return _Utils_Tuple2(
+						_Utils_update(
+							model,
+							{route: author$project$Main$UsersRoute}),
+						author$project$Main$getAllUsersCmd(token));
+				}
 			case 'ChangeLoginUsernameInput':
 				var str = msg.a;
 				return _Utils_Tuple2(
@@ -6095,12 +6156,35 @@ var author$project$Main$update = F2(
 							{bottomUserMessage: 'Authentication failed!', jwtToken: elm$core$Maybe$Nothing}),
 						elm$core$Platform$Cmd$none);
 				}
-			default:
+			case 'Logout':
 				return _Utils_Tuple2(
 					_Utils_update(
 						model,
-						{jwtToken: elm$core$Maybe$Nothing, route: author$project$Main$LoginRoute}),
+						{bottomUserMessage: 'Logged out!', jwtToken: elm$core$Maybe$Nothing, route: author$project$Main$LoginRoute}),
 					elm$core$Platform$Cmd$none);
+			default:
+				var response = msg.a;
+				if (response.$ === 'Err') {
+					var error = response.a;
+					return _Utils_Tuple2(
+						_Utils_update(
+							model,
+							{
+								bottomUserMessage: model.bottomUserMessage + (' Couldn\'t fetch all users: ' + author$project$Main$httpErrorToString(error))
+							}),
+						elm$core$Platform$Cmd$none);
+				} else {
+					var allUsersResponse = response.a;
+					return _Utils_Tuple2(
+						_Utils_update(
+							model,
+							{
+								usersPageData: {
+									users: elm$core$Maybe$Just(allUsersResponse.result)
+								}
+							}),
+						elm$core$Platform$Cmd$none);
+				}
 		}
 	});
 var elm$json$Json$Decode$map = _Json_map1;
@@ -6122,7 +6206,7 @@ var elm$html$Html$h3 = _VirtualDom_node('h3');
 var elm$virtual_dom$VirtualDom$text = _VirtualDom_text;
 var elm$html$Html$text = elm$virtual_dom$VirtualDom$text;
 var author$project$Main$bottomUserMessageView = function (bottomUserMessage) {
-	return A2(
+	return (bottomUserMessage === '') ? A2(elm$html$Html$div, _List_Nil, _List_Nil) : A2(
 		elm$html$Html$div,
 		_List_Nil,
 		_List_fromArray(
@@ -6189,6 +6273,7 @@ var author$project$Main$Logout = {$: 'Logout'};
 var author$project$Main$ShowHomePage = {$: 'ShowHomePage'};
 var author$project$Main$ShowLoginPage = {$: 'ShowLoginPage'};
 var author$project$Main$ShowRegisterPage = {$: 'ShowRegisterPage'};
+var author$project$Main$ShowUsersPage = {$: 'ShowUsersPage'};
 var elm$html$Html$a = _VirtualDom_node('a');
 var elm$html$Html$h5 = _VirtualDom_node('h5');
 var elm$html$Html$nav = _VirtualDom_node('nav');
@@ -6210,6 +6295,24 @@ var elm$html$Html$Events$onClick = function (msg) {
 		elm$json$Json$Decode$succeed(msg));
 };
 var author$project$Main$headerView = function (model) {
+	var usersPageBtn = function () {
+		var _n3 = model.jwtToken;
+		if (_n3.$ === 'Nothing') {
+			return elm$html$Html$text('');
+		} else {
+			return A2(
+				elm$html$Html$a,
+				_List_fromArray(
+					[
+						elm$html$Html$Events$onClick(author$project$Main$ShowUsersPage),
+						elm$html$Html$Attributes$class('p-2 text-white')
+					]),
+				_List_fromArray(
+					[
+						elm$html$Html$text('Users')
+					]));
+		}
+	}();
 	var registerPageBtn = function () {
 		var _n2 = model.jwtToken;
 		if (_n2.$ === 'Nothing') {
@@ -6309,7 +6412,7 @@ var author$project$Main$headerView = function (model) {
 						elm$html$Html$Attributes$class('my-2 my-md-0 mr-md-3')
 					]),
 				_List_fromArray(
-					[loginLogoutPageBtn, homePageBtn, registerPageBtn]))
+					[loginLogoutPageBtn, homePageBtn, usersPageBtn, registerPageBtn]))
 			]));
 };
 var author$project$Main$jwttokenView = function (jwttoken) {
@@ -6808,8 +6911,110 @@ var author$project$Main$registerView = function (data) {
 					]))
 			]));
 };
+var elm$html$Html$td = _VirtualDom_node('td');
+var elm$html$Html$tr = _VirtualDom_node('tr');
+var author$project$Main$displayUser = function (user) {
+	return A2(
+		elm$html$Html$tr,
+		_List_Nil,
+		_List_fromArray(
+			[
+				A2(
+				elm$html$Html$td,
+				_List_Nil,
+				_List_fromArray(
+					[
+						elm$html$Html$text(user.username)
+					])),
+				A2(
+				elm$html$Html$td,
+				_List_Nil,
+				_List_fromArray(
+					[
+						elm$html$Html$text(user.pw_hash)
+					])),
+				A2(
+				elm$html$Html$td,
+				_List_Nil,
+				_List_fromArray(
+					[
+						elm$html$Html$text(user.pw_salt)
+					]))
+			]));
+};
+var elm$core$List$map = F2(
+	function (f, xs) {
+		return A3(
+			elm$core$List$foldr,
+			F2(
+				function (x, acc) {
+					return A2(
+						elm$core$List$cons,
+						f(x),
+						acc);
+				}),
+			_List_Nil,
+			xs);
+	});
+var elm$html$Html$table = _VirtualDom_node('table');
+var elm$html$Html$th = _VirtualDom_node('th');
 var author$project$Main$usersView = function (data) {
-	return elm$html$Html$text('Users - TODO');
+	var usersTableHeading = A2(
+		elm$html$Html$tr,
+		_List_Nil,
+		_List_fromArray(
+			[
+				A2(
+				elm$html$Html$th,
+				_List_Nil,
+				_List_fromArray(
+					[
+						elm$html$Html$text('username')
+					])),
+				A2(
+				elm$html$Html$th,
+				_List_Nil,
+				_List_fromArray(
+					[
+						elm$html$Html$text('pw_hash')
+					])),
+				A2(
+				elm$html$Html$th,
+				_List_Nil,
+				_List_fromArray(
+					[
+						elm$html$Html$text('pw_salt')
+					]))
+			]));
+	var usersTable = function () {
+		var _n0 = data.users;
+		if (_n0.$ === 'Nothing') {
+			return elm$html$Html$text('No users loaded');
+		} else {
+			var users = _n0.a;
+			return A2(
+				elm$html$Html$table,
+				_List_Nil,
+				_Utils_ap(
+					_List_fromArray(
+						[usersTableHeading]),
+					A2(elm$core$List$map, author$project$Main$displayUser, users)));
+		}
+	}();
+	return A2(
+		elm$html$Html$div,
+		_List_Nil,
+		_List_fromArray(
+			[
+				A2(
+				elm$html$Html$h2,
+				_List_Nil,
+				_List_fromArray(
+					[
+						elm$html$Html$text('Users')
+					])),
+				usersTable
+			]));
 };
 var author$project$Main$view = function (model) {
 	var vw = function () {
@@ -6869,20 +7074,6 @@ var elm$core$Task$Perform = function (a) {
 	return {$: 'Perform', a: a};
 };
 var elm$core$Task$init = elm$core$Task$succeed(_Utils_Tuple0);
-var elm$core$List$map = F2(
-	function (f, xs) {
-		return A3(
-			elm$core$List$foldr,
-			F2(
-				function (x, acc) {
-					return A2(
-						elm$core$List$cons,
-						f(x),
-						acc);
-				}),
-			_List_Nil,
-			xs);
-	});
 var elm$core$Task$map = F2(
 	function (func, taskA) {
 		return A2(

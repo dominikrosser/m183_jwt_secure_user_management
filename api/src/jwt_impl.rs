@@ -50,5 +50,12 @@ pub fn has_access(cookies: &Cookies) -> bool {
         },
         None => false
     }
-    
+}
+
+pub fn has_access_from_jwt_token_str(token: &String) -> bool {
+    let result = decode::<UserRolesToken>(&token, KEY.as_ref(), &Validation::default());
+    match result {
+        Ok(_) => true,
+        Err(_) => false
+    }
 }

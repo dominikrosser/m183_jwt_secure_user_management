@@ -27,6 +27,14 @@ impl Login {
     }
 }
 
+#[derive(Serialize)]    // Convertable to json
+#[derive(Deserialize)]  // Convertable from json
+#[derive(FromForm)]
+pub struct JwtTokenFromClient {
+    pub token: String
+}
+
+
 
 //-- API Routes
 
@@ -62,9 +70,10 @@ pub fn login(conn: DbConn, mut cookies: Cookies, login_form: Json<Login>) -> Jso
     })
 }
 
-#[get("/users", format = "application/json")]
-pub fn all_users(conn: DbConn, cookies: Cookies) -> JsonValue {
-    let has_access = jwt_impl::has_access(&cookies);
+#[post("/users/all", format = "application/json", data = "<jwt_token>") ]
+pub fn all_users(conn: DbConn, jwt_token: Json<JwtTokenFromClient>) -> JsonValue {
+    //let has_access = jwt_impl::has_access(&cookies);
+    let has_access = jwt_impl::has_access_from_jwt_token_str(&jwt_token.token);
     if has_access {
         let users = User::all(&conn);
         // return users in json
@@ -81,7 +90,7 @@ pub fn all_users(conn: DbConn, cookies: Cookies) -> JsonValue {
     }
 }
 
-#[post("/users", format= "application/json", data = "<login_form>")]
+#[post("/users/add", format= "application/json", data = "<login_form>")]
 pub fn new_user(conn: DbConn, login_form: Json<Login>) -> JsonValue {
     let new_user = login_form.hash_user();
     let insert_ok: bool = User::insert(new_user/*.into_inner()*/, &conn);
@@ -94,9 +103,10 @@ pub fn new_user(conn: DbConn, login_form: Json<Login>) -> JsonValue {
     })
 }
 
-#[get("/users/<id>", format = "application/json")]
-pub fn show_user(conn: DbConn, cookies: Cookies, id: i32) -> JsonValue {
-    let has_access = jwt_impl::has_access(&cookies);
+#[post("/users/<id>", format = "application/json", data = "<jwt_token>") ]
+pub fn show_user(conn: DbConn, /*cookies: Cookies,*/jwt_token: Json<JwtTokenFromClient>, id: i32) -> JsonValue {
+    //let has_access = jwt_impl::has_access(&cookies);
+    let has_access = jwt_impl::has_access_from_jwt_token_str(&jwt_token.token);
     if has_access {
 
         let result = User::get_by_id(id, &conn);
@@ -116,47 +126,45 @@ pub fn show_user(conn: DbConn, cookies: Cookies, id: i32) -> JsonValue {
     }
 }
 
-#[put("/users/<id>", format = "application/json", data = "<user>")]
-pub fn update_user(conn: DbConn, cookies: Cookies, id: i32, user: Json<NewUser>) -> JsonValue {
-    let has_access = jwt_impl::has_access(&cookies);
-    if has_access {
+// #[put("/users/<id>", format = "application/json", data = "<user>")]
+// pub fn update_user(conn: DbConn, cookies: Cookies, id: i32, user: Json<NewUser>) -> JsonValue {
+//     let has_access = jwt_impl::has_access(&cookies);
+//     if has_access {
         
-        let status = if User::update_by_id(id, &conn, user.into_inner()) { 200 } else { 404 };
-        // Return status json
-        json!({
-            "status": status,
-            "result": null,
-        })
+//         let status = if User::update_by_id(id, &conn, user.into_inner()) { 200 } else { 404 };
+//         // Return status json
+//         json!({
+//             "status": status,
+//             "result": null,
+//         })
 
-    } else {
-        // Deny access
-        json!({
-            "status": 404,
-            "result": "[]"
-        })
-    }
-    
-}
+//     } else {
+//         // Deny access
+//         json!({
+//             "status": 404,
+//             "result": "[]"
+//         })
+//     }
+// }
 
-#[delete("/users/<id>")]
-pub fn delete_user(id: i32, conn: DbConn, cookies: Cookies) -> JsonValue {
-    let has_access = jwt_impl::has_access(&cookies);
-    if has_access {
+// #[delete("/users/<id>")]
+// pub fn delete_user(id: i32, conn: DbConn, cookies: Cookies) -> JsonValue {
+//     let has_access = jwt_impl::has_access(&cookies);
+//     if has_access {
 
-        // Del user
-        let status = if User::delete_by_id(id, &conn) { 200 } else { 404 };
-        // Return status
-        json!({
-            "status": status,
-            "result": null,
-        })
+//         // Del user
+//         let status = if User::delete_by_id(id, &conn) { 200 } else { 404 };
+//         // Return status
+//         json!({
+//             "status": status,
+//             "result": null,
+//         })
 
-    } else {
-        // Deny access
-        json!({
-            "status": 404,
-            "result": "[]"
-        })
-    }
-    
-}
+//     } else {
+//         // Deny access
+//         json!({
+//             "status": 404,
+//             "result": "[]"
+//         })
+//     }
+// }

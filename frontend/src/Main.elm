@@ -78,12 +78,12 @@ type alias User =
     }
 
 type alias UsersPageData =
-    { users: WebData (List User)
+    { users: Maybe (List User)
     }
 
 emptyUsersPageData : UsersPageData
 emptyUsersPageData =
-    UsersPageData RemoteData.NotAsked
+    UsersPageData Nothing
 
 type alias NewUser =
     { username: String
@@ -99,6 +99,7 @@ type Msg
     | ShowRegisterPage
     | ShowProfilePage
     | ShowHomePage
+    | ShowUsersPage
     | ChangeLoginUsernameInput String
     | ChangeLoginPasswordInput String
     | ChangeRegisterUsernameInput String
@@ -108,6 +109,7 @@ type Msg
     | GotRegisterUserResponse (Result Http.Error Bool) -- Bool=status true if successfully added
     | GotTryLoginResponse (Result Http.Error TryLoginResponse)
     | Logout
+    | GotAllUsersResponse (Result Http.Error GetAllUsersResponse)
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
@@ -129,6 +131,15 @@ update msg model =
 
         ShowProfilePage ->
             ( { model | route = ProfileRoute }, Cmd.none )
+
+        ShowUsersPage ->
+            case model.jwtToken of
+                
+                Nothing ->
+                    ( { model | bottomUserMessage = "You are not logged in!" }, Cmd.none )
+
+                Just token ->
+                    ( { model | route = UsersRoute }, getAllUsersCmd token )
 
         ChangeLoginUsernameInput str ->
             ( { model | loginPageData = { usernameInput = str, passwordInput = model.loginPageData.passwordInput }}, Cmd.none )
@@ -184,7 +195,17 @@ update msg model =
                         , Cmd.none )
 
         Logout ->
-            ( { model | route = LoginRoute, jwtToken = Nothing }, Cmd.none )
+            ( { model | route = LoginRoute, jwtToken = Nothing, bottomUserMessage = "Logged out!" }, Cmd.none )
+
+        GotAllUsersResponse response ->
+            case response of
+                Err error ->
+                    ( { model | bottomUserMessage = model.bottomUserMessage ++ " Couldn't fetch all users: " ++ httpErrorToString error }
+                    , Cmd.none )
+
+                Ok allUsersResponse ->
+                    ( { model | usersPageData = { users = Just allUsersResponse.result } }
+                    , Cmd.none )
             
 
 
@@ -210,7 +231,7 @@ registerUserCmd user =
                 |> Http.jsonBody
 
         url =
-            (urlPathToApi ++ "users")
+            (urlPathToApi ++ "users/add")
 
         expect = Http.expectJson GotRegisterUserResponse statusDecoder
 
@@ -220,6 +241,25 @@ registerUserCmd user =
         , body = body
         , expect = expect
         }
+
+getAllUsersCmd : String -> Cmd Msg
+getAllUsersCmd token =
+    let
+        body =
+            jwtTokenForServerEncoder token
+                |> Http.jsonBody
+
+        url =
+            (urlPathToApi ++ "users/all")
+
+        expect = Http.expectJson GotAllUsersResponse getAllUsersResponseDecoder
+    in
+    Http.post
+        { url = url
+        , body = body
+        , expect = expect
+        }
+    
 
 tryLoginCmd : NewUser -> Cmd Msg
 tryLoginCmd user =
@@ -284,6 +324,30 @@ newUserEncoder user =
         , ( "password", Json.Encode.string user.password )
         ]
 
+jwtTokenForServerEncoder : String -> Json.Encode.Value
+jwtTokenForServerEncoder token =
+    Json.Encode.object
+        [ ( "token", Json.Encode.string token )
+        ]
+
+getAllUsersResponseDecoder : Json.Decode.Decoder GetAllUsersResponse
+getAllUsersResponseDecoder =
+    Json.Decode.map2 GetAllUsersResponse
+        (Json.Decode.field "status" Json.Decode.int)
+        (Json.Decode.field "result" (Json.Decode.list userDecoder))
+
+type alias GetAllUsersResponse =
+    { status: Int
+    , result: List User
+    }
+
+userDecoder : Json.Decode.Decoder User
+userDecoder =
+    Json.Decode.map3 User
+        (Json.Decode.field "username" Json.Decode.string)
+        (Json.Decode.field "pw_hash" Json.Decode.string)
+        (Json.Decode.field "pw_salt" Json.Decode.string)
+
 
 -- VIEW
 
@@ -319,11 +383,14 @@ view model =
 
 bottomUserMessageView : String -> Html Msg
 bottomUserMessageView bottomUserMessage =
-    div []
-        [ h3 []
-            [ text "User Message:" ]
-        , text bottomUserMessage
-        ]
+    if bottomUserMessage == "" then
+        div[][]
+    else
+        div []
+            [ h3 []
+                [ text "User Message:" ]
+            , text bottomUserMessage
+            ]
 
 headerView : Model -> Html Msg
 headerView model =
@@ -349,6 +416,16 @@ headerView model =
                     a [ onClick ShowHomePage, class "p-2 text-white" ]
                         [ text "Home" ]
 
+        usersPageBtn =
+            case model.jwtToken of 
+                
+                Nothing ->
+                    text ""
+
+                Just _ ->
+                    a [ onClick ShowUsersPage, class "p-2 text-white" ]
+                        [ text "Users" ]
+
         registerPageBtn =
             case model.jwtToken of
                 
@@ -369,6 +446,7 @@ headerView model =
         , nav [ class "my-2 my-md-0 mr-md-3" ]
             [ loginLogoutPageBtn
             , homePageBtn
+            , usersPageBtn
             , registerPageBtn
             ]
         ]
@@ -501,7 +579,38 @@ registerView data =
 
 usersView : UsersPageData -> Html Msg
 usersView data =
-    text "Users - TODO"
+    let
+        usersTableHeading =
+            tr []
+                [ th [] [ text "username" ]
+                , th [] [ text "pw_hash" ]
+                , th [] [ text "pw_salt" ]
+                ]
+
+        usersTable =
+            case data.users of
+                
+                Nothing ->
+                    text "No users loaded"
+
+                Just users ->
+                    Html.table []
+                        ([ usersTableHeading ] ++
+                        (users |> List.map displayUser))
+    in
+    div []
+        [ h2 []
+            [ text "Users" ]
+        , usersTable
+        ]
+
+displayUser : User -> Html Msg
+displayUser user =
+    tr []
+        [ td [][ text user.username ]
+        , td [][ text user.pw_hash ]
+        , td [][ text user.pw_salt ]
+        ]
 
 homeView : Model -> Html Msg
 homeView model =

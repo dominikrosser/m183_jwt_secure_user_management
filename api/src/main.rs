@@ -75,7 +75,7 @@ fn main() {
         .mount(
             "/api/v1/",
             routes!
-                [ routes::all_users, routes::new_user, routes::show_user, routes::update_user, routes::delete_user
+                [ routes::all_users, routes::new_user, routes::show_user/*, routes::update_user, routes::delete_user*/
                 , routes::login ]
         )
 
