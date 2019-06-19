@@ -16,7 +16,10 @@ pub fn hash_data(data: &str) -> HashedData {
 
     // https://elliotekj.com/2017/04/02/hashing-sensitive-data-in-rust-with-argon2rs/
 
+    // Serverseitiger allgemeiner Salt (bzw. Pepper)
     let local_salt = env::var("LOCAL_SALT").expect("LOCAL_SALT must be set");
+
+    // Salt kreieren
     let random_salt = rand::thread_rng()
         .sample_iter(&Alphanumeric)
         .take(32)
