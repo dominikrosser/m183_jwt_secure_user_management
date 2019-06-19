@@ -56,9 +56,10 @@ pub fn login(conn: DbConn, mut cookies: Cookies, login_form: Json<Login>) -> Jso
         cookies.add(cookie);
 
         if !jwt_impl::has_access(&cookies) {
-            println!("Warning: Failed to create a valid cookie!!");
+            println!("Warning: Failed to create a jwt cookie!!");
         } else {
-            println!("Success: Created a valid cookie on login!!");
+            println!("Success: Created a valid jwt on login!!");
+            println!("Logged in!")
         }
 
     }
@@ -76,6 +77,7 @@ pub fn all_users(conn: DbConn, jwt_token: Json<JwtTokenFromClient>) -> JsonValue
     let has_access = jwt_impl::has_access_from_jwt_token_str(&jwt_token.token);
     if has_access {
         let users = User::all(&conn);
+        println("Sent all users")
         // return users in json
         json!({
             "status": 200,
