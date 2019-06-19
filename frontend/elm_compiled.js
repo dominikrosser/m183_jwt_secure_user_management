@@ -4485,11 +4485,11 @@ function _Browser_load(url)
 		}
 	}));
 }
-var author$project$Main$Model = F4(
-	function (route, loginPageData, registerPageData, usersPageData) {
-		return {loginPageData: loginPageData, registerPageData: registerPageData, route: route, usersPageData: usersPageData};
+var author$project$Main$LoginRoute = {$: 'LoginRoute'};
+var author$project$Main$Model = F6(
+	function (route, loginPageData, registerPageData, usersPageData, jwtToken, bottomUserMessage) {
+		return {bottomUserMessage: bottomUserMessage, jwtToken: jwtToken, loginPageData: loginPageData, registerPageData: registerPageData, route: route, usersPageData: usersPageData};
 	});
-var author$project$Main$ProfileRoute = {$: 'ProfileRoute'};
 var author$project$Main$LoginPageData = F2(
 	function (usernameInput, passwordInput) {
 		return {passwordInput: passwordInput, usernameInput: usernameInput};
@@ -4505,7 +4505,8 @@ var author$project$Main$UsersPageData = function (users) {
 };
 var krisajenkins$remotedata$RemoteData$NotAsked = {$: 'NotAsked'};
 var author$project$Main$emptyUsersPageData = author$project$Main$UsersPageData(krisajenkins$remotedata$RemoteData$NotAsked);
-var author$project$Main$initialModel = A4(author$project$Main$Model, author$project$Main$ProfileRoute, author$project$Main$emptyLoginPageData, author$project$Main$emptyRegisterPageData, author$project$Main$emptyUsersPageData);
+var elm$core$Maybe$Nothing = {$: 'Nothing'};
+var author$project$Main$initialModel = A6(author$project$Main$Model, author$project$Main$LoginRoute, author$project$Main$emptyLoginPageData, author$project$Main$emptyRegisterPageData, author$project$Main$emptyUsersPageData, elm$core$Maybe$Nothing, '');
 var elm$core$Basics$False = {$: 'False'};
 var elm$core$Basics$True = {$: 'True'};
 var elm$core$Result$isOk = function (result) {
@@ -4769,7 +4770,6 @@ var elm$core$Array$initialize = F2(
 var elm$core$Maybe$Just = function (a) {
 	return {$: 'Just', a: a};
 };
-var elm$core$Maybe$Nothing = {$: 'Nothing'};
 var elm$core$Result$Err = function (a) {
 	return {$: 'Err', a: a};
 };
@@ -4991,12 +4991,28 @@ var elm$core$Platform$Sub$none = elm$core$Platform$Sub$batch(_List_Nil);
 var author$project$Main$subscriptions = function (model) {
 	return elm$core$Platform$Sub$none;
 };
-var author$project$Main$LoginRoute = {$: 'LoginRoute'};
+var author$project$Main$HomeRoute = {$: 'HomeRoute'};
 var author$project$Main$NewUser = F2(
 	function (username, password) {
 		return {password: password, username: username};
 	});
+var author$project$Main$ProfileRoute = {$: 'ProfileRoute'};
 var author$project$Main$RegisterRoute = {$: 'RegisterRoute'};
+var author$project$Main$httpErrorToString = function (httpError) {
+	switch (httpError.$) {
+		case 'BadUrl':
+			return 'Bad Url (did not provide a valid URL)';
+		case 'Timeout':
+			return 'TimeoutError (took too long to get a response)';
+		case 'NetworkError':
+			return 'NetworkError';
+		case 'BadStatus':
+			return 'Bad Status (got a response back but status code indicates failure)';
+		default:
+			var str = httpError.a;
+			return 'Bad Body (body of response was smth. unexpected) ' + str;
+	}
+};
 var author$project$Main$GotRegisterUserResponse = function (a) {
 	return {$: 'GotRegisterUserResponse', a: a};
 };
@@ -5026,9 +5042,9 @@ var author$project$Main$newUserEncoder = function (user) {
 				elm$json$Json$Encode$string(user.password))
 			]));
 };
+var elm$json$Json$Decode$bool = _Json_decodeBool;
 var elm$json$Json$Decode$field = _Json_decodeField;
-var elm$json$Json$Decode$string = _Json_decodeString;
-var author$project$Main$statusDecoder = A2(elm$json$Json$Decode$field, 'status', elm$json$Json$Decode$string);
+var author$project$Main$statusDecoder = A2(elm$json$Json$Decode$field, 'status', elm$json$Json$Decode$bool);
 var author$project$Main$urlPathToApi = 'http://0.0.0.0:8181/api/v1/';
 var elm$core$Result$mapError = F2(
 	function (f, result) {
@@ -5924,16 +5940,46 @@ var author$project$Main$registerUserCmd = function (user) {
 	return elm$http$Http$post(
 		{body: body, expect: expect, url: url});
 };
-var author$project$Main$tryLoginCmd = elm$core$Platform$Cmd$none;
+var author$project$Main$GotTryLoginResponse = function (a) {
+	return {$: 'GotTryLoginResponse', a: a};
+};
+var author$project$Main$TryLoginResponse = F2(
+	function (jwttoken, status) {
+		return {jwttoken: jwttoken, status: status};
+	});
+var elm$json$Json$Decode$map2 = _Json_map2;
+var elm$json$Json$Decode$string = _Json_decodeString;
+var author$project$Main$loginResponseDecoder = A3(
+	elm$json$Json$Decode$map2,
+	author$project$Main$TryLoginResponse,
+	A2(elm$json$Json$Decode$field, 'result', elm$json$Json$Decode$string),
+	A2(elm$json$Json$Decode$field, 'status', elm$json$Json$Decode$bool));
+var author$project$Main$tryLoginCmd = function (user) {
+	var url = author$project$Main$urlPathToApi + 'login';
+	var expect = A2(elm$http$Http$expectJson, author$project$Main$GotTryLoginResponse, author$project$Main$loginResponseDecoder);
+	var body = elm$http$Http$jsonBody(
+		author$project$Main$newUserEncoder(user));
+	return elm$http$Http$post(
+		{body: body, expect: expect, url: url});
+};
 var author$project$Main$update = F2(
 	function (msg, model) {
 		switch (msg.$) {
 			case 'ShowHomePage':
-				return _Utils_Tuple2(
-					_Utils_update(
-						model,
-						{route: author$project$Main$LoginRoute}),
-					elm$core$Platform$Cmd$none);
+				var _n1 = model.jwtToken;
+				if (_n1.$ === 'Nothing') {
+					return _Utils_Tuple2(
+						_Utils_update(
+							model,
+							{route: author$project$Main$LoginRoute}),
+						elm$core$Platform$Cmd$none);
+				} else {
+					return _Utils_Tuple2(
+						_Utils_update(
+							model,
+							{route: author$project$Main$HomeRoute}),
+						elm$core$Platform$Cmd$none);
+				}
 			case 'ShowLoginPage':
 				return _Utils_Tuple2(
 					_Utils_update(
@@ -6001,7 +6047,7 @@ var author$project$Main$update = F2(
 						_Utils_update(
 							model,
 							{
-								registerPageData: {passwordInput: model.registerPageData.passwordInput, usernameInput: 'Failed to add new user!'}
+								bottomUserMessage: 'Failed to add new user! Error: ' + author$project$Main$httpErrorToString(error)
 							}),
 						elm$core$Platform$Cmd$none);
 				} else {
@@ -6010,16 +6056,48 @@ var author$project$Main$update = F2(
 						_Utils_update(
 							model,
 							{
-								registerPageData: {passwordInput: model.registerPageData.passwordInput, usernameInput: 'Added new user, Status: ' + status}
+								bottomUserMessage: 'Added new user, Status: ' + (status ? 'true' : 'false'),
+								loginPageData: {passwordInput: model.registerPageData.passwordInput, usernameInput: model.registerPageData.usernameInput},
+								route: author$project$Main$LoginRoute
+							}),
+						author$project$Main$tryLoginCmd(
+							A2(author$project$Main$NewUser, model.registerPageData.usernameInput, model.registerPageData.passwordInput)));
+				}
+			case 'TryLogin':
+				return _Utils_Tuple2(
+					model,
+					author$project$Main$tryLoginCmd(
+						A2(author$project$Main$NewUser, model.loginPageData.usernameInput, model.loginPageData.passwordInput)));
+			default:
+				var result = msg.a;
+				if (result.$ === 'Err') {
+					var error = result.a;
+					return _Utils_Tuple2(
+						_Utils_update(
+							model,
+							{
+								bottomUserMessage: 'Failed to login! Error: ' + author$project$Main$httpErrorToString(error)
 							}),
 						elm$core$Platform$Cmd$none);
+				} else {
+					var response = result.a;
+					return response.status ? _Utils_Tuple2(
+						_Utils_update(
+							model,
+							{
+								bottomUserMessage: 'Logged in!',
+								jwtToken: elm$core$Maybe$Just(response.jwttoken),
+								route: author$project$Main$HomeRoute
+							}),
+						elm$core$Platform$Cmd$none) : _Utils_Tuple2(
+						_Utils_update(
+							model,
+							{bottomUserMessage: 'Authentication failed!', jwtToken: elm$core$Maybe$Nothing}),
+						elm$core$Platform$Cmd$none);
 				}
-			default:
-				return _Utils_Tuple2(model, author$project$Main$tryLoginCmd);
 		}
 	});
 var elm$json$Json$Decode$map = _Json_map1;
-var elm$json$Json$Decode$map2 = _Json_map2;
 var elm$json$Json$Decode$succeed = _Json_succeed;
 var elm$virtual_dom$VirtualDom$toHandlerInt = function (handler) {
 	switch (handler.$) {
@@ -6034,10 +6112,27 @@ var elm$virtual_dom$VirtualDom$toHandlerInt = function (handler) {
 	}
 };
 var elm$html$Html$div = _VirtualDom_node('div');
-var elm$html$Html$footer = _VirtualDom_node('footer');
-var elm$html$Html$small = _VirtualDom_node('small');
+var elm$html$Html$h3 = _VirtualDom_node('h3');
 var elm$virtual_dom$VirtualDom$text = _VirtualDom_text;
 var elm$html$Html$text = elm$virtual_dom$VirtualDom$text;
+var author$project$Main$bottomUserMessageView = function (bottomUserMessage) {
+	return A2(
+		elm$html$Html$div,
+		_List_Nil,
+		_List_fromArray(
+			[
+				A2(
+				elm$html$Html$h3,
+				_List_Nil,
+				_List_fromArray(
+					[
+						elm$html$Html$text('User Message:')
+					])),
+				elm$html$Html$text(bottomUserMessage)
+			]));
+};
+var elm$html$Html$footer = _VirtualDom_node('footer');
+var elm$html$Html$small = _VirtualDom_node('small');
 var elm$html$Html$Attributes$stringProperty = F2(
 	function (key, string) {
 		return A2(
@@ -6167,6 +6262,47 @@ var author$project$Main$headerView = A2(
 						]))
 				]))
 		]));
+var author$project$Main$jwttokenView = function (jwttoken) {
+	var displayToken = function () {
+		if (jwttoken.$ === 'Just') {
+			var token = jwttoken.a;
+			return token;
+		} else {
+			return 'No valid jwt token';
+		}
+	}();
+	return A2(
+		elm$html$Html$div,
+		_List_Nil,
+		_List_fromArray(
+			[
+				A2(
+				elm$html$Html$h3,
+				_List_Nil,
+				_List_fromArray(
+					[
+						elm$html$Html$text('Jwt Token: ')
+					])),
+				elm$html$Html$text(displayToken)
+			]));
+};
+var elm$html$Html$h2 = _VirtualDom_node('h2');
+var author$project$Main$homeView = function (model) {
+	return A2(
+		elm$html$Html$div,
+		_List_Nil,
+		_List_fromArray(
+			[
+				A2(
+				elm$html$Html$h2,
+				_List_Nil,
+				_List_fromArray(
+					[
+						elm$html$Html$text('Home')
+					])),
+				author$project$Main$jwttokenView(model.jwtToken)
+			]));
+};
 var author$project$Main$ChangeLoginPasswordInput = function (a) {
 	return {$: 'ChangeLoginPasswordInput', a: a};
 };
@@ -6174,7 +6310,6 @@ var author$project$Main$ChangeLoginUsernameInput = function (a) {
 	return {$: 'ChangeLoginUsernameInput', a: a};
 };
 var author$project$Main$TryLogin = {$: 'TryLogin'};
-var elm$html$Html$h2 = _VirtualDom_node('h2');
 var elm$html$Html$input = _VirtualDom_node('input');
 var elm$html$Html$label = _VirtualDom_node('label');
 var elm$html$Html$section = _VirtualDom_node('section');
@@ -6636,8 +6771,10 @@ var author$project$Main$view = function (model) {
 				return author$project$Main$profileView;
 			case 'RegisterRoute':
 				return author$project$Main$registerView(model.registerPageData);
-			default:
+			case 'UsersRoute':
 				return author$project$Main$usersView(model.usersPageData);
+			default:
+				return author$project$Main$homeView(model);
 		}
 	}();
 	return A2(
@@ -6653,7 +6790,11 @@ var author$project$Main$view = function (model) {
 						elm$html$Html$Attributes$class('container')
 					]),
 				_List_fromArray(
-					[vw, author$project$Main$footerView]))
+					[
+						vw,
+						author$project$Main$bottomUserMessageView(model.bottomUserMessage),
+						author$project$Main$footerView
+					]))
 			]));
 };
 var elm$browser$Browser$External = function (a) {

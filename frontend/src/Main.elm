@@ -38,6 +38,8 @@ type alias Model =
     , loginPageData: LoginPageData
     , registerPageData: RegisterPageData
     , usersPageData: UsersPageData
+    , jwtToken: Maybe String
+    , bottomUserMessage: String
     }
 
 type Route
@@ -45,10 +47,11 @@ type Route
     | ProfileRoute
     | RegisterRoute
     | UsersRoute
+    | HomeRoute
 
 initialModel : Model
 initialModel =
-    Model ProfileRoute emptyLoginPageData emptyRegisterPageData emptyUsersPageData
+    Model LoginRoute emptyLoginPageData emptyRegisterPageData emptyUsersPageData Nothing ""
 
 type alias LoginPageData =
     { usernameInput: String
@@ -102,14 +105,20 @@ type Msg
     | ChangeRegisterPasswordInput String
     | RegisterUser
     | TryLogin
-    | GotRegisterUserResponse (Result Http.Error String) -- String=status true if successfully added
+    | GotRegisterUserResponse (Result Http.Error Bool) -- Bool=status true if successfully added
+    | GotTryLoginResponse (Result Http.Error TryLoginResponse)
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
 
         ShowHomePage ->
-            ( { model | route = LoginRoute }, Cmd.none )
+            case model.jwtToken of
+                Nothing ->
+                    ( { model | route = LoginRoute }, Cmd.none )
+
+                Just _ ->
+                    ( { model | route = HomeRoute }, Cmd.none )
 
         ShowLoginPage ->
             ( { model | route = LoginRoute }, Cmd.none )
@@ -138,13 +147,40 @@ update msg model =
         GotRegisterUserResponse result ->
             case result of
                 Err error ->
-                    ( { model | registerPageData = { usernameInput = "Failed to add new user!", passwordInput = model.registerPageData.passwordInput }}, Cmd.none )
+                    ( { model | bottomUserMessage = "Failed to add new user! Error: " ++ httpErrorToString error }
+                    , Cmd.none )
 
                 Ok status ->
-                    ( { model | registerPageData = { usernameInput = "Added new user, Status: " ++ status, passwordInput = model.registerPageData.passwordInput }}, Cmd.none )
+                    ( { model
+                        | bottomUserMessage = "Added new user, Status: " ++ if status then "true" else "false"
+                        , loginPageData = { usernameInput = model.registerPageData.usernameInput, passwordInput = model.registerPageData.passwordInput }
+                        , route = LoginRoute
+                      }
+                    , tryLoginCmd (NewUser model.registerPageData.usernameInput model.registerPageData.passwordInput) )
 
         TryLogin ->
-            ( model, tryLoginCmd )
+            ( model, tryLoginCmd (NewUser model.loginPageData.usernameInput model.loginPageData.passwordInput))
+
+        GotTryLoginResponse result ->
+            case result of
+                Err error ->
+                    ( { model | bottomUserMessage = "Failed to login! Error: " ++ httpErrorToString error }
+                    , Cmd.none )
+                    
+                Ok response ->
+                    if response.status then
+                        ( { model
+                            | bottomUserMessage = "Logged in!" 
+                            , jwtToken = Just response.jwttoken
+                            , route = HomeRoute
+                          }
+                        , Cmd.none )
+                    else
+                        ( { model
+                            | bottomUserMessage = "Authentication failed!" 
+                            , jwtToken = Nothing
+                          }
+                        , Cmd.none )
             
 
 
@@ -181,17 +217,61 @@ registerUserCmd user =
         , expect = expect
         }
 
-tryLoginCmd : Cmd msg
-tryLoginCmd =
-    Cmd.none
+tryLoginCmd : NewUser -> Cmd Msg
+tryLoginCmd user =
+    let
+        body =
+            newUserEncoder user
+                |> Http.jsonBody
+
+        url =
+            (urlPathToApi ++ "login")
+
+        expect = Http.expectJson GotTryLoginResponse loginResponseDecoder
+            
+    in
+    Http.post
+        { url = url
+        , body = body
+        , expect = expect
+        }
+
+httpErrorToString : Http.Error -> String
+httpErrorToString httpError =
+    case httpError of
+      Http.BadUrl _ ->
+        "Bad Url (did not provide a valid URL)"
+
+      Http.Timeout ->
+        "TimeoutError (took too long to get a response)"
+
+      Http.NetworkError ->
+        "NetworkError"
+
+      Http.BadStatus _ ->
+        "Bad Status (got a response back but status code indicates failure)"
+
+      Http.BadBody str ->
+        "Bad Body (body of response was smth. unexpected) " ++ str
 
 
 
 -- DECODERS & ENCODERS
 
-statusDecoder : Json.Decode.Decoder String
+statusDecoder : Json.Decode.Decoder Bool
 statusDecoder =
-    Json.Decode.field "status" Json.Decode.string
+    Json.Decode.field "status" Json.Decode.bool
+
+type alias TryLoginResponse =
+    { jwttoken : String
+    , status : Bool
+    }
+
+loginResponseDecoder : Json.Decode.Decoder TryLoginResponse
+loginResponseDecoder =
+    Json.Decode.map2 TryLoginResponse
+        (Json.Decode.field "result" Json.Decode.string)
+        (Json.Decode.field "status" Json.Decode.bool)
 
 newUserEncoder : NewUser -> Json.Encode.Value
 newUserEncoder user =
@@ -219,14 +299,26 @@ view model =
 
                 UsersRoute ->
                     usersView model.usersPageData
+
+                HomeRoute ->
+                    homeView model
             
     in
     div []
         [ headerView
         , div [class "container"]
             [ vw
+            , bottomUserMessageView model.bottomUserMessage
             , footerView
             ]
+        ]
+
+bottomUserMessageView : String -> Html Msg
+bottomUserMessageView bottomUserMessage =
+    div []
+        [ h3 []
+            [ text "User Message:" ]
+        , text bottomUserMessage
         ]
 
 headerView : Html Msg
@@ -373,3 +465,29 @@ registerView data =
 usersView : UsersPageData -> Html Msg
 usersView data =
     text "Users - TODO"
+
+homeView : Model -> Html Msg
+homeView model =
+    div []
+        [ h2 []
+            [ text "Home" ]
+        , jwttokenView model.jwtToken
+        ]
+
+jwttokenView : Maybe String -> Html Msg
+jwttokenView jwttoken =
+    let
+        displayToken =
+            case jwttoken of
+                Just token ->
+                    token
+                    
+                Nothing ->
+                    "No valid jwt token"
+    in
+    
+    div []
+        [ h3 []
+            [ text "Jwt Token: "]
+        , text displayToken
+        ]
