@@ -107,6 +107,7 @@ type Msg
     | TryLogin
     | GotRegisterUserResponse (Result Http.Error Bool) -- Bool=status true if successfully added
     | GotTryLoginResponse (Result Http.Error TryLoginResponse)
+    | Logout
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
@@ -181,6 +182,9 @@ update msg model =
                             , jwtToken = Nothing
                           }
                         , Cmd.none )
+
+        Logout ->
+            ( { model | route = LoginRoute, jwtToken = Nothing }, Cmd.none )
             
 
 
@@ -305,7 +309,7 @@ view model =
             
     in
     div []
-        [ headerView
+        [ headerView model
         , div [class "container"]
             [ vw
             , bottomUserMessageView model.bottomUserMessage
@@ -321,18 +325,51 @@ bottomUserMessageView bottomUserMessage =
         , text bottomUserMessage
         ]
 
-headerView : Html Msg
-headerView =
+headerView : Model -> Html Msg
+headerView model =
+    let
+        loginLogoutPageBtn =
+            case model.jwtToken of
+
+                Nothing ->
+                    a [ onClick ShowLoginPage, class "p-2 text-white" ]
+                        [ text "Anmelden" ]
+
+                Just _ ->
+                    a [ onClick Logout, class "p-2 text-white" ]
+                        [ text "Abmelden" ]
+
+        homePageBtn =
+            case model.jwtToken of
+                
+                Nothing ->
+                    text ""
+
+                Just _ ->
+                    a [ onClick ShowHomePage, class "p-2 text-white" ]
+                        [ text "Home" ]
+
+        registerPageBtn =
+            case model.jwtToken of
+                
+                Nothing ->
+                    a [ onClick ShowRegisterPage, class "p-2 text-white" ]
+                        [ text "Registrieren" ]
+
+                Just _ ->
+                    text ""
+
+    in
+    
     div [ class "d-flex flex-column flex-md-row align-items-center p-3 px-md-4 mb-3 bg-dark border-bottom shadow-sm" ]
         [ a [ onClick ShowHomePage, class "my-0 mr-md-auto font-weight-normal text-white" ]
             [ h5 [ class "my-0 mr-md-auto font-weight-normal" ]
                 [ text "Secure UserManagement" ]
             ]
         , nav [ class "my-2 my-md-0 mr-md-3" ]
-            [ a [ onClick ShowLoginPage, class "p-2 text-white" ]
-                [ text "Anmelden" ]
-            , a [ onClick ShowRegisterPage, class "p-2 text-white" ]
-                [ text "Registrieren" ]
+            [ loginLogoutPageBtn
+            , homePageBtn
+            , registerPageBtn
             ]
         ]
 

@@ -6068,7 +6068,7 @@ var author$project$Main$update = F2(
 					model,
 					author$project$Main$tryLoginCmd(
 						A2(author$project$Main$NewUser, model.loginPageData.usernameInput, model.loginPageData.passwordInput)));
-			default:
+			case 'GotTryLoginResponse':
 				var result = msg.a;
 				if (result.$ === 'Err') {
 					var error = result.a;
@@ -6095,6 +6095,12 @@ var author$project$Main$update = F2(
 							{bottomUserMessage: 'Authentication failed!', jwtToken: elm$core$Maybe$Nothing}),
 						elm$core$Platform$Cmd$none);
 				}
+			default:
+				return _Utils_Tuple2(
+					_Utils_update(
+						model,
+						{jwtToken: elm$core$Maybe$Nothing, route: author$project$Main$LoginRoute}),
+					elm$core$Platform$Cmd$none);
 		}
 	});
 var elm$json$Json$Decode$map = _Json_map1;
@@ -6179,6 +6185,7 @@ var author$project$Main$footerView = A2(
 						]))
 				]))
 		]));
+var author$project$Main$Logout = {$: 'Logout'};
 var author$project$Main$ShowHomePage = {$: 'ShowHomePage'};
 var author$project$Main$ShowLoginPage = {$: 'ShowLoginPage'};
 var author$project$Main$ShowRegisterPage = {$: 'ShowRegisterPage'};
@@ -6202,66 +6209,109 @@ var elm$html$Html$Events$onClick = function (msg) {
 		'click',
 		elm$json$Json$Decode$succeed(msg));
 };
-var author$project$Main$headerView = A2(
-	elm$html$Html$div,
-	_List_fromArray(
-		[
-			elm$html$Html$Attributes$class('d-flex flex-column flex-md-row align-items-center p-3 px-md-4 mb-3 bg-dark border-bottom shadow-sm')
-		]),
-	_List_fromArray(
-		[
-			A2(
-			elm$html$Html$a,
-			_List_fromArray(
-				[
-					elm$html$Html$Events$onClick(author$project$Main$ShowHomePage),
-					elm$html$Html$Attributes$class('my-0 mr-md-auto font-weight-normal text-white')
-				]),
-			_List_fromArray(
-				[
-					A2(
-					elm$html$Html$h5,
-					_List_fromArray(
-						[
-							elm$html$Html$Attributes$class('my-0 mr-md-auto font-weight-normal')
-						]),
-					_List_fromArray(
-						[
-							elm$html$Html$text('Secure UserManagement')
-						]))
-				])),
-			A2(
-			elm$html$Html$nav,
-			_List_fromArray(
-				[
-					elm$html$Html$Attributes$class('my-2 my-md-0 mr-md-3')
-				]),
-			_List_fromArray(
-				[
-					A2(
-					elm$html$Html$a,
-					_List_fromArray(
-						[
-							elm$html$Html$Events$onClick(author$project$Main$ShowLoginPage),
-							elm$html$Html$Attributes$class('p-2 text-white')
-						]),
-					_List_fromArray(
-						[
-							elm$html$Html$text('Anmelden')
-						])),
-					A2(
-					elm$html$Html$a,
-					_List_fromArray(
-						[
-							elm$html$Html$Events$onClick(author$project$Main$ShowRegisterPage),
-							elm$html$Html$Attributes$class('p-2 text-white')
-						]),
-					_List_fromArray(
-						[
-							elm$html$Html$text('Registrieren')
-						]))
-				]))
-		]));
+var author$project$Main$headerView = function (model) {
+	var registerPageBtn = function () {
+		var _n2 = model.jwtToken;
+		if (_n2.$ === 'Nothing') {
+			return A2(
+				elm$html$Html$a,
+				_List_fromArray(
+					[
+						elm$html$Html$Events$onClick(author$project$Main$ShowRegisterPage),
+						elm$html$Html$Attributes$class('p-2 text-white')
+					]),
+				_List_fromArray(
+					[
+						elm$html$Html$text('Registrieren')
+					]));
+		} else {
+			return elm$html$Html$text('');
+		}
+	}();
+	var loginLogoutPageBtn = function () {
+		var _n1 = model.jwtToken;
+		if (_n1.$ === 'Nothing') {
+			return A2(
+				elm$html$Html$a,
+				_List_fromArray(
+					[
+						elm$html$Html$Events$onClick(author$project$Main$ShowLoginPage),
+						elm$html$Html$Attributes$class('p-2 text-white')
+					]),
+				_List_fromArray(
+					[
+						elm$html$Html$text('Anmelden')
+					]));
+		} else {
+			return A2(
+				elm$html$Html$a,
+				_List_fromArray(
+					[
+						elm$html$Html$Events$onClick(author$project$Main$Logout),
+						elm$html$Html$Attributes$class('p-2 text-white')
+					]),
+				_List_fromArray(
+					[
+						elm$html$Html$text('Abmelden')
+					]));
+		}
+	}();
+	var homePageBtn = function () {
+		var _n0 = model.jwtToken;
+		if (_n0.$ === 'Nothing') {
+			return elm$html$Html$text('');
+		} else {
+			return A2(
+				elm$html$Html$a,
+				_List_fromArray(
+					[
+						elm$html$Html$Events$onClick(author$project$Main$ShowHomePage),
+						elm$html$Html$Attributes$class('p-2 text-white')
+					]),
+				_List_fromArray(
+					[
+						elm$html$Html$text('Home')
+					]));
+		}
+	}();
+	return A2(
+		elm$html$Html$div,
+		_List_fromArray(
+			[
+				elm$html$Html$Attributes$class('d-flex flex-column flex-md-row align-items-center p-3 px-md-4 mb-3 bg-dark border-bottom shadow-sm')
+			]),
+		_List_fromArray(
+			[
+				A2(
+				elm$html$Html$a,
+				_List_fromArray(
+					[
+						elm$html$Html$Events$onClick(author$project$Main$ShowHomePage),
+						elm$html$Html$Attributes$class('my-0 mr-md-auto font-weight-normal text-white')
+					]),
+				_List_fromArray(
+					[
+						A2(
+						elm$html$Html$h5,
+						_List_fromArray(
+							[
+								elm$html$Html$Attributes$class('my-0 mr-md-auto font-weight-normal')
+							]),
+						_List_fromArray(
+							[
+								elm$html$Html$text('Secure UserManagement')
+							]))
+					])),
+				A2(
+				elm$html$Html$nav,
+				_List_fromArray(
+					[
+						elm$html$Html$Attributes$class('my-2 my-md-0 mr-md-3')
+					]),
+				_List_fromArray(
+					[loginLogoutPageBtn, homePageBtn, registerPageBtn]))
+			]));
+};
 var author$project$Main$jwttokenView = function (jwttoken) {
 	var displayToken = function () {
 		if (jwttoken.$ === 'Just') {
@@ -6782,7 +6832,7 @@ var author$project$Main$view = function (model) {
 		_List_Nil,
 		_List_fromArray(
 			[
-				author$project$Main$headerView,
+				author$project$Main$headerView(model),
 				A2(
 				elm$html$Html$div,
 				_List_fromArray(
